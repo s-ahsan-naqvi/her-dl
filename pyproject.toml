@@ -1,0 +1,19 @@
+[project]
+name = "her-dl"
+version = "0.1.0"
+description = "Human Emotion Recognition Deep Learning Project"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "cryptography>=48.0.0",
+    "flask",
+    "matplotlib>=3.10.9",
+    "numpy>=2.4.4",
+    "opencv-python-headless>=4.13.0.92",
+    "pandas>=2.1.0",
+    "pillow>=12.2.0",
+    "scikit-learn",
+    "seaborn",
+    "tensorboard",
+    "tensorflow>=2.21.0",
+]

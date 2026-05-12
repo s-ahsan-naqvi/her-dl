@@ -54,3 +54,9 @@ Thumbs.db
 # Misc
 .cache/
 *.log
+
+# Dataset
+fer2013
+
+# Logs
+logs

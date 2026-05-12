@@ -1,0 +1,44 @@
+{
+  "model_type": "transfer_learning",
+  "model_name": "EmotionNet_MobileNetV2",
+  "backbone": "MobileNetV2",
+  "dataset": "FER2013",
+  "input_size": [
+    96,
+    96
+  ],
+  "channels": 3,
+  "preprocessing": "mobilenet_v2",
+  "class_names": [
+    "Angry",
+    "Disgust",
+    "Fear",
+    "Happy",
+    "Sad",
+    "Surprise",
+    "Neutral"
+  ],
+  "training": {
+    "head_epochs": 100,
+    "fine_tune_epochs": 100,
+    "fine_tune_at": -30,
+    "head_lr": 0.001,
+    "fine_tune_lr": 1e-05,
+    "batch_size": 32,
+    "freeze_bn": true,
+    "class_weights_enabled": true
+  },
+  "stage_1": {
+    "epochs_ran": 14,
+    "best_val_accuracy": 0.37896203994750977
+  },
+  "stage_2": {
+    "epochs_ran": 39,
+    "best_val_accuracy": 0.4409613311290741
+  },
+  "test_results": {
+    "loss": 1.7449556589126587,
+    "accuracy": 0.44329896569252014,
+    "top_2_accuracy": 0.6441906094551086
+  }
+}

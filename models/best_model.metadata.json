@@ -1,0 +1,54 @@
+{
+  "model_type": "baseline_cnn",
+  "model": "EmotionNet_MobileInspired",
+  "dataset": "FER2013",
+  "epochs_run": 64,
+  "max_epochs": 100,
+  "batch_size": 128,
+  "initial_lr": 0.001,
+  "label_smoothing": 0.0,
+  "class_weights_enabled": false,
+  "augmentation_enabled": true,
+  "brightness_augmentation_enabled": false,
+  "monitor": "val_loss",
+  "overfit_samples": 0,
+  "best_monitor_value": 1.143934965133667,
+  "best_val_accuracy": 0.5970045328140259,
+  "test_loss": 1.1466487646102905,
+  "test_accuracy": null,
+  "test_top_2_accuracy": null,
+  "emotion_classes": [
+    "Angry",
+    "Disgust",
+    "Fear",
+    "Happy",
+    "Sad",
+    "Surprise",
+    "Neutral"
+  ],
+  "input_shape": [
+    48,
+    48,
+    1
+  ],
+  "input_size": [
+    48,
+    48
+  ],
+  "channels": 1,
+  "preprocessing": "grayscale_0_1",
+  "architecture": {
+    "input_size": "48x48x1",
+    "depthwise_separable_convolutions": true,
+    "global_average_pooling": true,
+    "regularization": "L2 + Dropout",
+    "label_smoothing": 0.0
+  },
+  "artifacts": {
+    "keras_model": "models/best_model.keras",
+    "best_weights": "models/best_model.weights.h5",
+    "training_history_csv": "logs/training_history.csv",
+    "training_curves": "logs/training_curves.png"
+  },
+  "training_time_note": "See logs/training_history.csv for per-epoch data"
+}

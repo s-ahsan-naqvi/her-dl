@@ -3,329 +3,337 @@
 **Project for Human-Computer Interaction / Deep Learning Course**  
 **Group Members:** Abdur Rahman Goraya (2022035) · Ahsan Naqvi (2022073)
 
+This project trains, evaluates, and deploys facial emotion-recognition models on the FER-2013 dataset. It includes:
+
+- a lightweight custom baseline CNN for fast grayscale inference,
+- a MobileNetV2 transfer-learning model for a stronger accuracy-oriented baseline,
+- offline evaluation plots and classification reports,
+- offline testing and benchmarking, and
+- a Flask web interface for image upload and API-style prediction.
+
+---
+
+## 📌 Quick Start
+
+```bash
+cd /home/arg/Documents/her-dl
+pip install -r requirements.txt
+python train_model.py --data fer2013 --epochs 100 --batch_size 64
+python test_model.py --model models/best_model.keras --data fer2013
+python app.py
+```
+
+If you use an AMD ROCm setup that needs a graphics override, export it before training or inference:
+
+```bash
+export HSA_OVERRIDE_GFX_VERSION=10.3.0
+```
+
+For full installation, hyperparameter, training, evaluation, and troubleshooting notes, see [`SETUP_AND_RUN.md`](SETUP_AND_RUN.md).
+
+---
+
+## 📊 Baseline Model Performance
+
+The saved baseline CNN checkpoint currently reports the following metadata:
+
+| Item | Value |
+|---|---:|
+| Model | `EmotionNet_MobileInspired` |
+| Input | `48×48×1` grayscale |
+| Best validation accuracy | **59.70%** |
+| Test loss | **1.1466** |
+| Epochs run | **64** |
+| Batch size | **128** |
+| Learning rate | **0.001** |
+| Augmentation | Enabled |
+| Class weights | Disabled |
+| Checkpoint | `models/best_model.keras` |
+
+Generated baseline summary image:
+
+![Baseline CNN performance summary](logs/baseline_performance_summary.png)
+
+Generated evaluation plots from `test_model.py`:
+
+![Baseline confusion matrix](logs/primary_model_confusion_matrix.png)
+
+![Baseline per-class metrics](logs/primary_model_per_class_metrics.png)
+
+The matching text report is saved at `logs/primary_model_classification_report.txt`.
+
+> Note: `fer2013/` is currently empty in this checkout, so any future re-run of the evaluation pipeline will require the FER-2013 dataset in the expected folder structure. Running `python test_model.py --model models/best_model.keras --data fer2013` will regenerate the same baseline evaluation artifacts in `logs/`.
+
 ---
 
 ## 📋 Background Research Summary
 
-### 1. The FER2013 Dataset (Goodfellow et al., 2013)
+### 1. FER-2013 Dataset
 
-The FER2013 dataset was introduced by Ian Goodfellow, Mehdi Mirza, and colleagues at the **30th International Conference on Machine Learning (ICML 2013)** in Atlanta, Georgia. It was part of a "Challenges in Representation Learning" competition alongside two other tasks.
+FER-2013 was introduced as part of the ICML 2013 Challenges in Representation Learning competition. It is a difficult “in-the-wild” facial-expression dataset because images are low-resolution, noisy, imbalanced, and collected from uncontrolled web sources.
 
 **Dataset characteristics:**
-- **35,887 total images** (28,709 training · 3,589 public test · 3,589 private test)
-- **48×48 pixel grayscale images** collected by scraping Google Image Search
-- **7 emotion classes:** Angry, Disgust, Fear, Happy, Sad, Surprise, Neutral
-- **Severe class imbalance:** Happy (8,989) vs Disgust (547) — 16× ratio
-- **Noise:** Images were automatically labeled using Amazon Mechanical Turk, leading to significant label noise. Human accuracy on this dataset is estimated at only **65.5%**
 
-The competition winner, Yichuan Tang, used an SVM loss function in a deep neural network, achieving **71.2% accuracy** — a landmark result at the time. Most early baselines were in the 40-60% range, showing the difficulty of "in-the-wild" recognition.
+- **35,887 total images**: 28,709 training, 3,589 public test, 3,589 private test.
+- **48×48 grayscale images**.
+- **7 emotion classes**: Angry, Disgust, Fear, Happy, Sad, Surprise, Neutral.
+- **Strong class imbalance**: Happy is much more common than Disgust.
+- **Label noise**: labels were collected through crowd annotation, so many examples are ambiguous or mislabeled.
+- **Human-level reference**: commonly reported human accuracy is about **65.5%**.
 
-**Citation:** Goodfellow, I.J., et al. (2013). *Challenges in Representation Learning: A report on three machine learning contests.* Proceedings of ICNIP. [arXiv:1307.0414]
+This makes FER-2013 a useful benchmark for HCI emotion-recognition experiments because it reflects many real-world difficulties: lighting variation, pose variation, occlusion, low resolution, ambiguous expressions, and class imbalance.
 
----
+### 2. CNNs for Facial Expression Recognition
 
-### 2. CNN Evolution for FER: From HOG/SVM to Deep Learning
+Older facial-expression systems often used hand-crafted features such as Haar-like features, HOG descriptors, and SVM classifiers. CNNs improved performance by learning features directly from image pixels:
 
-**Traditional methods (pre-2013):**
-- **Haar Cascades** (Viola & Jones, 2001): Fast face detection using rectangular feature differences across image regions. OpenCV's implementation uses 6,000+ features across 38 cascading stages — only ~10 features are evaluated per non-face region, making it extremely fast.
-- **HOG + SVM:** Histogram of Oriented Gradients describes local gradient distributions; SVM classifies. Robust for controlled conditions but fails on variations in pose, lighting, and subtle expressions.
+- early layers learn edges and simple texture patterns,
+- middle layers learn facial parts such as eyes, brows, and mouth corners,
+- deeper layers combine these features into expression-level representations.
 
-**Deep learning breakthrough:**
-CNNs learn hierarchical spatial features automatically via backpropagation:
-- **Layer 1-2:** Edge detectors (Gabor-like wavelets)
-- **Layer 3-4:** Part detectors (eye corners, mouth shapes)
-- **Layer 5+:** High-level expression detectors
+Representative FER-2013 results from the literature include:
 
-Key CNN results on FER2013:
-| Model | Accuracy | Year |
-|---|---|---|
-| Baseline SVM | ~44% | 2013 |
-| Tang (2013) SVM-loss CNN | 71.2% | 2013 |
-| VGG-16 (Simonyan) | ~72.7% | 2014 |
-| Ensemble CNNs | ~74.3% | 2018 |
-| EfficientNet V2 | ~76%+ | 2021 |
-| **Human accuracy** | **~65.5%** | — |
+| Model / Method | Approx. Accuracy | Notes |
+|---|---:|---|
+| Traditional SVM baseline | ~44% | Hand-crafted features |
+| Tang SVM-loss CNN | 71.2% | ICML 2013 winning approach |
+| VGG-style CNNs | ~72% | Larger deep CNNs |
+| Ensemble CNNs | ~74% | Multiple models combined |
+| EfficientNet-style models | 76%+ | Modern transfer-learning families |
+| Human reference | ~65.5% | Dataset is noisy and subjective |
 
----
+### 3. MobileNet and Depthwise Separable Convolutions
 
-### 3. MobileNet Architecture (Howard et al., 2017)
+The custom baseline CNN is inspired by MobileNet’s efficient depthwise separable convolutions. Instead of applying a full convolution that mixes spatial and channel information at the same time, a depthwise separable block splits the operation into:
 
-Standard convolution on a DxD input with N filters = **D × D × M × N × Dk × Dk** multiply-adds.
+1. **Depthwise convolution**: one spatial filter per input channel.
+2. **Pointwise convolution**: a `1×1` convolution that mixes channels.
 
-**Depthwise Separable Convolution** factorizes this into two steps:
-1. **Depthwise conv:** Apply one Dk×Dk filter per input channel → D × D × M × Dk × Dk
-2. **Pointwise conv (1×1):** Project channels → D × D × M × N
+This reduces computation substantially compared with standard convolution and makes the baseline suitable for low-latency local or web-app inference.
 
-**Reduction ratio:** 1/N + 1/Dk² ≈ **8-9× fewer operations** for Dk=3
+### 4. Affective Computing and HCI Motivation
 
-This enables real-time inference on mobile/edge devices. Our EmotionNet uses this principle across 4 stages (64→128→256→512 filters), keeping total parameters ~1.2M versus VGG16's 138M.
+Facial emotion recognition is part of affective computing: building systems that can detect, interpret, or adapt to human emotional signals. Potential HCI applications include:
 
-**Citation:** Howard, A.G., et al. (2017). *MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications.* arXiv:1704.04861.
-
----
-
-### 4. The Affective Computing & HCI Context
-
-Emotion recognition sits at the intersection of **affective computing** (Picard, 1997) and HCI. The "affective gap" is the inability of machines to respond to human emotional states, causing frustration in interactions. Key application domains:
-
-- **Mental health monitoring:** Longitudinal tracking of mood via passive facial analysis
-- **Intelligent tutoring:** Adjusting curriculum difficulty based on detected confusion/frustration  
-- **Customer analytics:** Real-time sentiment in retail and service environments
-- **Accessibility:** Helping individuals with ASD interpret others' emotional states
-
-Paul Ekman's foundational work (1970s) established **6 universal expressions** (the 7th — neutral — was added later): anger, disgust, fear, happiness, sadness, surprise. FER2013 follows this taxonomy directly.
+- adaptive tutoring systems,
+- mental-health and mood monitoring,
+- accessibility tools,
+- customer-service analytics,
+- human-robot interaction, and
+- context-aware user interfaces.
 
 ---
 
-## 🏗️ Project Architecture
+## 🏗️ Project Structure
 
-```
-emotion_recognition/
-├── model.py                  # CNN architecture (MobileNet-inspired)
-├── data_loader.py            # FER2013 loading, preprocessing, augmentation
-├── train_model.py            # Full training pipeline
-├── test_model.py             # Evaluation: confusion matrix, metrics, benchmarks
-├── realtime_inference.py     # Live webcam + Haar Cascade inference
-├── app.py                    # Flask web application
-├── templates/
-│   └── index.html            # Web UI
-├── models/                   # Saved model weights
-├── logs/                     # Training curves, reports
-└── screenshots/              # Saved webcam frames
+```text
+her-dl/
+├── app.py                         # Flask web application
+├── data_loader.py                 # FER-2013 loading, preprocessing, augmentation
+├── model.py                       # Baseline CNN and MobileNetV2 transfer model
+├── train_model.py                 # Baseline CNN training script
+├── train_transfer.py              # Two-stage transfer-learning script
+├── test_model.py                  # Evaluation, comparison, and benchmark script
+├── requirements.txt               # Python dependencies
+├── SETUP_AND_RUN.md               # Detailed run guide and hyperparameter reference
+├── fer2013/                       # Dataset directory: train/ and test/ class folders
+├── models/                        # Saved .keras checkpoints and metadata sidecars
+├── logs/                          # Training/evaluation plots and reports
+├── screenshots/                   # Optional saved prediction screenshots
+└── templates/
+    └── index.html                 # Flask UI template
 ```
 
 ---
 
-## 🧪 Model Architecture Detail
+## 🧪 Baseline CNN Architecture
 
-```
-INPUT: 48×48×1 (grayscale face, normalized to [0,1])
+The baseline model is `EmotionNet_MobileInspired`, a compact grayscale CNN using standard convolution blocks followed by depthwise separable convolution blocks.
+
+```text
+Input: 48×48×1 grayscale face normalized to [0, 1]
 │
-├── Stem (Standard Conv Blocks)
-│   ├── Conv2D(32, 3×3) → BN → ReLU6
-│   └── Conv2D(32, 3×3) → BN → ReLU6
-│   MaxPool2D(2×2)  ─── 48×48 → 24×24
+├── Conv2D(32, 3×3) → BatchNorm → ReLU6
+├── Conv2D(32, 3×3) → BatchNorm → ReLU6
+├── MaxPool2D
 │
-├── Stage 1 (Depthwise Separable)
-│   ├── DSConv(64) + Dropout(0.10)
-│   └── DSConv(64) + Dropout(0.10)
-│   MaxPool2D(2×2)  ─── 24×24 → 12×12
+├── DepthwiseSeparableConv(64)  → Dropout(0.10)
+├── DepthwiseSeparableConv(64)  → Dropout(0.10)
+├── MaxPool2D
 │
-├── Stage 2
-│   ├── DSConv(128) + Dropout(0.15)
-│   └── DSConv(128) + Dropout(0.15)
-│   MaxPool2D(2×2)  ─── 12×12 → 6×6
+├── DepthwiseSeparableConv(128) → Dropout(0.15)
+├── DepthwiseSeparableConv(128) → Dropout(0.15)
+├── MaxPool2D
 │
-├── Stage 3
-│   ├── DSConv(256) + Dropout(0.20)
-│   └── DSConv(256) + Dropout(0.20)
-│   MaxPool2D(2×2)  ─── 6×6 → 3×3
+├── DepthwiseSeparableConv(256) → Dropout(0.20)
+├── DepthwiseSeparableConv(256) → Dropout(0.20)
+├── MaxPool2D
 │
-├── Stage 4
-│   └── DSConv(512) + Dropout(0.25)
+├── DepthwiseSeparableConv(512) → Dropout(0.25)
+├── GlobalAveragePooling2D
 │
-├── Global Average Pooling  ─── 3×3 → 1×1 (no Flatten)
-│
-├── Dense(256) → BN → Dropout(0.50)
-├── Dense(128) → BN → Dropout(0.30)
-└── Dense(7, Softmax)  ─── 7 emotion classes
+├── Dense(256) → BatchNorm → Dropout(0.50)
+├── Dense(128) → BatchNorm → Dropout(0.30)
+└── Dense(7, Softmax)
 ```
 
-**Regularization strategy:**
-- L2 weight decay (1e-4) on all conv layers
-- Progressive Dropout (0.10 → 0.50 in classifier head)
-- Label smoothing (0.1): avoids overconfidence, helpful given FER2013's noisy labels
-- Balanced class weighting: compensates for Disgust underrepresentation
+**Regularization and optimization choices:**
+
+- L2 weight decay of `1e-4` in convolution and dense layers.
+- Progressive dropout from `0.10` in early feature blocks to `0.50` in the classifier head.
+- Adam optimizer with configurable learning rate.
+- Optional label smoothing for noisy labels.
+- Optional class weighting for FER-2013 class imbalance.
+- Early stopping and learning-rate reduction on plateau.
 
 ---
 
-## 🚀 Setup & Installation
+## 🔁 Transfer-Learning Architecture
 
-### Prerequisites
-- Python 3.9+
-- pip
+The transfer-learning path builds `EmotionNet_MobileNetV2`:
 
-### Install dependencies
+```text
+Input: 96×96×3 RGB image
+│
+├── MobileNetV2 backbone, ImageNet weights, include_top=False
+├── GlobalAveragePooling2D
+├── BatchNormalization
+├── Dropout(0.20)
+├── Dense(256, ReLU, L2=1e-4)
+├── BatchNormalization
+├── Dropout(0.30)
+└── Dense(7, Softmax)
+```
+
+Training is done in two stages:
+
+1. **Head training**: freeze MobileNetV2 and train only the new classifier head.
+2. **Fine tuning**: unfreeze the top MobileNetV2 layers and continue training with a much smaller learning rate.
+
+---
+
+## 📂 Dataset Layout
+
+Download FER-2013 from Kaggle and place it in `fer2013/`:
+
+```text
+fer2013/
+├── train/
+│   ├── angry/
+│   ├── disgust/
+│   ├── fear/
+│   ├── happy/
+│   ├── neutral/
+│   ├── sad/
+│   └── surprise/
+└── test/
+    ├── angry/
+    ├── disgust/
+    ├── fear/
+    ├── happy/
+    ├── neutral/
+    ├── sad/
+    └── surprise/
+```
+
+Kaggle dataset link: <https://www.kaggle.com/datasets/msambare/fer2013>
+
+---
+
+## 🚀 Common Commands
+
+### Train the baseline CNN
 
 ```bash
-cd emotion_recognition/
-pip install tensorflow keras numpy opencv-python-headless matplotlib seaborn scikit-learn flask pillow
+python train_model.py --data fer2013 --epochs 100 --batch_size 64
 ```
 
-### (Optional) Download FER2013
-
-For real training, download the dataset from Kaggle:
-```
-https://www.kaggle.com/datasets/msambare/fer2013
-```
-Place `fer2013.csv` in the project directory.
-
----
-
-## 📖 Usage
-
-### 1. Test the architecture (no data needed)
+### Train the transfer-learning model
 
 ```bash
-python test_model.py --arch_only
+python train_transfer.py --data fer2013 --head_epochs 10 --fine_tune_epochs 10 --model_path models/transfer_best_model.keras
 ```
 
-Expected output:
-```
-[ArchTest] Building model...
-Total parameters: ~1,200,000
-Batch=1: output=(1, 7) ✓
-Batch=4: output=(4, 7) ✓
-Inference Speed Test:
-  Batch Size |  Mean (ms) |  Std (ms) |      FPS
-           1 |       8.50 |      1.20 |    117.6
-           8 |      25.30 |      2.10 |    316.2
-          32 |      89.40 |      5.30 |    357.9
-Real-time feasibility (≥25 FPS at batch=1): ✓ YES
-```
-
-### 2. Train with synthetic data (quick smoke test)
+### Evaluate one model
 
 ```bash
-python train_model.py --synthetic --synthetic_n 5000 --epochs 10
+python test_model.py --model models/best_model.keras --data fer2013
 ```
 
-### 3. Train on real FER2013
+### Compare baseline and transfer-learning models
 
 ```bash
-python train_model.py --data fer2013.csv --epochs 100 --batch_size 64
+python test_model.py --model models/best_model.keras --compare_model models/transfer_best_model.keras --data fer2013
 ```
 
-Training output files:
-- `models/best_model.keras` — best checkpoint by val_accuracy
-- `logs/training_curves.png` — accuracy & loss plots
-- `logs/training_history.csv` — per-epoch metrics
-- `logs/training_metadata.json` — full run metadata
-
-### 4. Full evaluation
-
-```bash
-# With trained model + real data:
-python test_model.py --model models/best_model.keras --data fer2013.csv
-
-# With synthetic data:
-python test_model.py --model models/best_model.keras --synthetic
-```
-
-Outputs:
-- `logs/confusion_matrix.png` — absolute + normalized confusion matrices
-- `logs/per_class_metrics.png` — per-class precision/recall/F1 bars
-- `logs/classification_report.txt` — full sklearn report
-
-### 5. Real-time webcam inference
-
-```bash
-# With webcam:
-python realtime_inference.py --model models/best_model.keras
-
-# Demo mode (no webcam):
-python realtime_inference.py --demo
-
-# Save to video:
-python realtime_inference.py --model models/best_model.keras --save_video output.avi
-```
-
-Controls: `Q` quit · `S` screenshot · `P` pause · `+/-` adjust sensitivity
-
-### 6. Web application
+### Launch the Flask app
 
 ```bash
 python app.py
-# Open: http://localhost:5000
 ```
 
-The web app lets you:
-- Upload any face image
-- See emotion predictions with probability bars
-- View annotated output image with bounding boxes
-- Use the `/api/demo` endpoint for API testing
+Then open <http://localhost:5000>.
 
 ---
 
-## 📊 Expected Results on Real FER2013
+## 🔬 Inference Pipeline
 
-| Metric | Expected Value | Notes |
-|---|---|---|
-| Top-1 Accuracy | 65–70% | Matches human performance |
-| Top-2 Accuracy | 85–90% | Two most likely emotions |
-| Happy (F1) | ~85% | Most samples, easiest class |
-| Disgust (F1) | ~40% | Only 547 training samples |
-| Inference (1 face) | <15ms | Real-time capable |
-| FPS (webcam) | >25 FPS | Smooth real-time |
+```text
+Camera or uploaded image
+        │
+        ▼
+OpenCV image loading / webcam frame capture
+        │
+        ▼
+Face preprocessing
+  - grayscale path for baseline CNN
+  - RGB + MobileNetV2 preprocessing for transfer model
+        │
+        ▼
+Resize to model input size
+  - baseline: 48×48×1
+  - transfer: 96×96×3
+        │
+        ▼
+Model forward pass
+        │
+        ▼
+Softmax probabilities over 7 emotions
+        │
+        ▼
+Predicted emotion, confidence score, and optional visualization
+```
 
-### Challenging aspects of FER2013:
-1. **Label noise:** Many images are mislabeled by Amazon Mechanical Turk workers
-2. **Class imbalance:** Disgust has 16× fewer samples than Happy
-3. **In-the-wild:** Uncontrolled lighting, pose, occlusion
-4. **Low resolution:** 48×48 loses subtle micro-expressions
+The runtime loads metadata sidecars such as `models/best_model.metadata.json` and `models/transfer_best_model.metadata.json`, allowing the same inference scripts to adapt to different model input sizes and preprocessing schemes.
 
 ---
 
-## 🔬 Inference Pipeline Detail
+## 📈 Expected Results
 
-```
-Webcam Frame (640×480, BGR)
-        │
-        ▼
-Grayscale conversion (cv2.cvtColor)
-        │
-        ▼
-CLAHE enhancement (local contrast normalization)
-        │
-        ▼
-Haar Cascade face detection (haarcascade_frontalface_default.xml)
-  - scaleFactor=1.1 (image pyramid step)
-  - minNeighbors=5 (false positive suppression)
-  - minSize=(60,60) pixels
-        │
-        ▼
-For each detected face ROI:
-  ├── Resize to 48×48 (INTER_AREA)
-  ├── Histogram equalization (lighting normalization)
-  ├── Normalize to [0,1]
-  └── Shape: (1, 48, 48, 1)
-        │
-        ▼
-Batch all faces → EmotionNet CNN
-        │
-        ▼
-Softmax probabilities (7 classes)
-        │
-        ▼
-Draw bounding box + label + probability bars on frame
-        │
-        ▼
-Display with FPS counter
-```
+FER-2013 is noisy and challenging, so performance varies with preprocessing, augmentation, class weighting, learning rate, and training duration.
+
+| Model | Input | Expected Strength | Tradeoff |
+|---|---|---|---|
+| Baseline CNN | `48×48×1` | Fast and lightweight | Lower ceiling than large transfer models |
+| MobileNetV2 transfer model | `96×96×3` | Better feature reuse from ImageNet | Slower and heavier |
+
+A well-trained CNN on FER-2013 often aims for roughly human-level performance near **65%** top-1 accuracy, with higher top-2 accuracy because some labels are ambiguous even to humans.
 
 ---
 
 ## 📚 References
 
-1. **Goodfellow, I.J., et al. (2013).** *Challenges in Representation Learning: A report on three machine learning contests.* Proceedings of the International Conference on Neural Information Processing. [arXiv:1307.0414]
-
-2. **Lopes, A.T., et al. (2017).** *Facial expression recognition with convolutional neural networks: Coping with few data and the training of a specific fully convolutional network.* Pattern Recognition, 61, 650–662.
-
-3. **Simonyan, K. & Zisserman, A. (2014).** *Very Deep Convolutional Networks for Large-Scale Image Recognition.* arXiv:1409.1556. [VGG]
-
-4. **Howard, A.G., et al. (2017).** *MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications.* arXiv:1704.04861.
-
-5. **Viola, P. & Jones, M. (2001).** *Rapid Object Detection using a Boosted Cascade of Simple Features.* Proceedings of CVPR, 2001.
-
-6. **Ekman, P. & Friesen, W.V. (1971).** *Constants across cultures in the face and emotion.* Journal of Personality and Social Psychology, 17(2), 124–129.
-
-7. **He, K., et al. (2016).** *Deep Residual Learning for Image Recognition (ResNet).* Proceedings of CVPR, 2016.
+1. Goodfellow, I. J., et al. (2013). *Challenges in Representation Learning: A report on three machine learning contests.* arXiv:1307.0414.
+2. Howard, A. G., et al. (2017). *MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications.* arXiv:1704.04861.
+3. Simonyan, K. and Zisserman, A. (2014). *Very Deep Convolutional Networks for Large-Scale Image Recognition.* arXiv:1409.1556.
+4. Viola, P. and Jones, M. (2001). *Rapid Object Detection using a Boosted Cascade of Simple Features.* CVPR.
+5. Ekman, P. and Friesen, W. V. (1971). *Constants across cultures in the face and emotion.* Journal of Personality and Social Psychology.
+6. Picard, R. W. (1997). *Affective Computing.* MIT Press.
 
 ---
 
 ## 🤝 Acknowledgments
 
-Dataset: FER2013 — Kaggle / Goodfellow et al.  
-Framework: TensorFlow / Keras  
-Face Detection: OpenCV Haar Cascades (Viola & Jones)  
-Architecture inspiration: MobileNet (Howard et al.)
+- Dataset: FER-2013 / Kaggle / Goodfellow et al.
+- Frameworks: TensorFlow, Keras, scikit-learn, OpenCV, Flask.
+- Architecture inspiration: MobileNet and efficient CNN design.
